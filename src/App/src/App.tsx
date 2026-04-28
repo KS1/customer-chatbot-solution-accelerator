@@ -185,19 +185,35 @@ function App() {
 
 
   // Chat functions
-  const handleVoiceMessage = (text: string, role: 'user' | 'assistant') => {
+  const handleVoiceMessage = async (text: string, role: 'user' | 'assistant') => {
+    let sessionId = currentSessionId;
+
+    // Create a chat session on the first voice message so the prompt is
+    // stored under a real session key and the welcome screen is replaced.
+    if (!sessionId && role === 'user') {
+      try {
+        const sessionData = await createNewChatSession();
+        sessionId = sessionData.session_id;
+        setCurrentSessionId(sessionId);
+        saveCurrentSessionId(sessionId);
+      } catch {
+        toast.error('Failed to start chat session');
+        return;
+      }
+    }
+
     const msg: ChatMessage = {
       id: `voice-${role}-${Date.now()}`,
       content: text,
       sender: role,
       timestamp: createTimestamp()
     };
-    queryClient.setQueryData(['chat', currentSessionId], (old: ChatMessage[] = []) => [...old, msg]);
+    queryClient.setQueryData(['chat', sessionId], (old: ChatMessage[] = []) => [...old, msg]);
     if (role === 'assistant') {
       setIsTyping(false);
     }
-    if (currentSessionId) {
-      saveVoiceMessage(currentSessionId, text, role);
+    if (sessionId) {
+      saveVoiceMessage(sessionId, text, role);
     }
   };
 
