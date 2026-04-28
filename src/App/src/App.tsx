@@ -186,7 +186,9 @@ function App() {
 
   // Chat functions
   const handleVoiceMessage = async (text: string, role: 'user' | 'assistant') => {
-    let sessionId = currentSessionId;
+    // Use localStorage fallback to avoid race where React state hasn't
+    // propagated the newly created session ID yet.
+    let sessionId = currentSessionId || getCurrentSessionId();
 
     // Create a chat session on the first voice message so the prompt is
     // stored under a real session key and the welcome screen is replaced.
@@ -202,6 +204,12 @@ function App() {
       }
     }
 
+    // Guard: if sessionId is still null (e.g. assistant message arrived
+    // before session was created), skip to avoid writing to ['chat', null].
+    if (!sessionId) {
+      return;
+    }
+
     const msg: ChatMessage = {
       id: `voice-${role}-${Date.now()}`,
       content: text,
@@ -212,9 +220,7 @@ function App() {
     if (role === 'assistant') {
       setIsTyping(false);
     }
-    if (sessionId) {
-      saveVoiceMessage(sessionId, text, role);
-    }
+    saveVoiceMessage(sessionId, text, role);
   };
 
   const handleSendMessage = async (content: string) => {

@@ -314,6 +314,7 @@ export const EnhancedChatPanel = ({
     setIsVoiceTransitioning(true);
     sessionReadyRef.current = false;
     awaitingResponseRef.current = false;
+    voiceStructuredPostedRef.current = false;
     audioBufferQueueRef.current = [];
     if (responseTimeoutRef.current) {
       clearTimeout(responseTimeoutRef.current);
@@ -500,6 +501,7 @@ export const EnhancedChatPanel = ({
           setInputValue('');
           lastSentTranscriptRef.current = transcript;
           awaitingResponseRef.current = true;
+          voiceStructuredPostedRef.current = false;
 
           // Display user transcript in chat
           onVoiceMessageRef.current?.(transcript, 'user');
@@ -509,14 +511,19 @@ export const EnhancedChatPanel = ({
           responseTimeoutRef.current = setTimeout(() => {
             if (awaitingResponseRef.current) {
               awaitingResponseRef.current = false;
+              voiceStructuredPostedRef.current = false;
               setVoiceError('No response received. Please try again.');
               setStreamingVoiceText('');
               setVoiceSessionState('idle');
               const ws = wsRef.current;
               wsRef.current = null;
-              if (ws && ws.readyState === WebSocket.OPEN) {
-                ws.send(JSON.stringify({ type: 'stop_session' }));
-                ws.close();
+              if (ws) {
+                if (ws.readyState === WebSocket.OPEN) {
+                  ws.send(JSON.stringify({ type: 'stop_session' }));
+                }
+                if (ws.readyState !== WebSocket.CLOSED) {
+                  ws.close();
+                }
               }
             }
           }, 30_000);
@@ -526,6 +533,12 @@ export const EnhancedChatPanel = ({
         }
 
         if (message.type === 'audio_data' && message.data) {
+          // Assistant is responding — clear the no-response timeout
+          awaitingResponseRef.current = false;
+          if (responseTimeoutRef.current) {
+            clearTimeout(responseTimeoutRef.current);
+            responseTimeoutRef.current = null;
+          }
           setVoiceSessionState('speaking');
           isSpeakingRef.current = true;
           playAssistantAudioChunk(message.data, message.sampleRate || 24000);
@@ -534,6 +547,12 @@ export const EnhancedChatPanel = ({
         // Tool result arrives BEFORE audio playback starts — render product cards
         // immediately so they appear before the assistant begins speaking.
         if (message.type === 'tool_result' && typeof message.structuredText === 'string' && message.structuredText.trim()) {
+          // Assistant is responding — clear the no-response timeout
+          awaitingResponseRef.current = false;
+          if (responseTimeoutRef.current) {
+            clearTimeout(responseTimeoutRef.current);
+            responseTimeoutRef.current = null;
+          }
           setStreamingVoiceText('');
           onVoiceMessageRef.current?.(message.structuredText, 'assistant');
           voiceStructuredPostedRef.current = true;
@@ -541,6 +560,14 @@ export const EnhancedChatPanel = ({
 
         // Show intermediate transcript text as it streams in (alongside audio)
         if (message.type === 'transcript' && message.role === 'assistant' && !message.isFinal && message.text) {
+          // Assistant is responding — clear the no-response timeout
+          if (awaitingResponseRef.current) {
+            awaitingResponseRef.current = false;
+            if (responseTimeoutRef.current) {
+              clearTimeout(responseTimeoutRef.current);
+              responseTimeoutRef.current = null;
+            }
+          }
           setStreamingVoiceText(message.text);
         }
 
@@ -634,6 +661,7 @@ export const EnhancedChatPanel = ({
         }
         setVoiceError('Voice connection closed before a response was received. Please try again.');
       }
+      voiceStructuredPostedRef.current = false;
       setStreamingVoiceText('');
       await stopMicrophoneCapture();
       setIsVoiceActive(false);
