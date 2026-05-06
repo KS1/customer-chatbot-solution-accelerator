@@ -76,11 +76,11 @@ jobs:
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       - name: Log in to Azure Container Registry
-        run: az acr login --name ${{ secrets.ACR_LOGIN_SERVER }}
+        run: az acr login --name ${{ secrets.ACR_TEST_LOGIN_SERVER }}
 
       - name: Output ACR Login Server
         run: |
-          echo "ACR Login Server: ${{ secrets.ACR_LOGIN_SERVER }}"
+          echo "ACR Login Server: ${{ secrets.ACR_TEST_LOGIN_SERVER }}"
       - name: Build and Push Docker Image for WebApp
         uses: docker/build-push-action@v7
         env:
@@ -90,8 +90,8 @@ jobs:
           file: ./src/App/Dockerfile
           push: true
           tags: |
-            ${{ secrets.ACR_LOGIN_SERVER || 'acrlogin.azurecr.io' }}/frontend:${{ steps.determine_tag.outputs.tagname }}
-            ${{ secrets.ACR_LOGIN_SERVER || 'acrlogin.azurecr.io' }}/frontend:${{ steps.generate_docker_tag.outputs.IMAGE_TAG }}
+            ${{ secrets.ACR_TEST_LOGIN_SERVER || 'acrlogin.azurecr.io' }}/frontend:${{ steps.determine_tag.outputs.tagname }}
+            ${{ secrets.ACR_TEST_LOGIN_SERVER || 'acrlogin.azurecr.io' }}/frontend:${{ steps.generate_docker_tag.outputs.IMAGE_TAG }}
       - name: Build and Push Docker Image for API
         uses: docker/build-push-action@v7
         env:
@@ -101,8 +101,8 @@ jobs:
           file: ./src/api/Dockerfile
           push: true
           tags: |
-            ${{ secrets.ACR_LOGIN_SERVER || 'acrlogin.azurecr.io' }}/backend:${{ steps.determine_tag.outputs.tagname }}
-            ${{ secrets.ACR_LOGIN_SERVER || 'acrlogin.azurecr.io' }}/backend:${{ steps.generate_docker_tag.outputs.IMAGE_TAG }}
+            ${{ secrets.ACR_TEST_LOGIN_SERVER || 'acrlogin.azurecr.io' }}/backend:${{ steps.determine_tag.outputs.tagname }}
+            ${{ secrets.ACR_TEST_LOGIN_SERVER || 'acrlogin.azurecr.io' }}/backend:${{ steps.generate_docker_tag.outputs.IMAGE_TAG }}
       - name: Verify Docker Image Build
         shell: bash
         run: |
@@ -113,7 +113,7 @@ jobs:
         if: always()
         shell: bash
         run: |
-          ACR_NAME=$(echo "${{ secrets.ACR_LOGIN_SERVER }}")
+          ACR_NAME=$(echo "${{ secrets.ACR_TEST_LOGIN_SERVER }}")
           echo "## 🐳 Docker Build Job Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
