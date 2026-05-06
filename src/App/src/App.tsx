@@ -9,10 +9,13 @@ import { useChatHistorySave } from '@/hooks/useChatHistorySave';
 import {
   addToCart,
   checkoutCart,
+  createNewChatSession,
   createTimestamp,
   getCart,
+  getCurrentSessionId,
   getProducts,
   removeFromCart,
+  saveCurrentSessionId,
   saveVoiceMessage,
   updateCartItem,
 } from '@/lib/api';
@@ -30,7 +33,7 @@ import { setChatOpen } from '@/store/slices/appSlice';
 import { fetchChatHistory } from '@/store/slices/chatHistorySlice';
 import { addLocalUserMessage, setGeneratingResponse } from '@/store/slices/chatSlice';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 function App() {
@@ -191,20 +194,52 @@ function App() {
     }
   }, [dispatch, fetchMessages, startNewConversation]);
 
+  // Serialise voice message handling so the user message (including session
+  // creation and its DB save) always completes before the assistant message
+  // is processed. Without this, the two fire-and-forget calls from the
+  // WebSocket handler race and the assistant save can reach the server first,
+  // causing wrong message order in the DB and in the UI after a refetch.
+  const voiceMessageQueueRef = useRef<Promise<void>>(Promise.resolve());
+
   const handleVoiceMessage = useCallback((text: string, role: 'user' | 'assistant') => {
-    const msg: ChatMessage = {
-      id: `voice-${role}-${Date.now()}`,
-      content: text,
-      sender: role,
-      timestamp: createTimestamp()
-    };
-    dispatch(addLocalUserMessage(msg));
-    if (role === 'assistant') {
-      dispatch(setGeneratingResponse(false));
-    }
-    if (currentSessionId) {
-      saveVoiceMessage(currentSessionId, text, role);
-    }
+    voiceMessageQueueRef.current = voiceMessageQueueRef.current
+      .catch(() => { /* don't let a failed save block the queue */ })
+      .then(async () => {
+        // Use localStorage fallback to avoid race where React state hasn't
+        // propagated the newly created session ID yet.
+        let sessionId = currentSessionId || getCurrentSessionId();
+
+        // Create a chat session on the first voice message so the prompt is
+        // stored under a real session key and the welcome screen is replaced.
+        if (!sessionId && role === 'user') {
+          try {
+            const sessionData = await createNewChatSession();
+            sessionId = sessionData.session_id;
+            saveCurrentSessionId(sessionId);
+          } catch {
+            toast.error('Failed to start chat session');
+            return;
+          }
+        }
+
+        // Guard: if sessionId is still null (e.g. assistant message arrived
+        // before session was created), skip.
+        if (!sessionId) {
+          return;
+        }
+
+        const msg: ChatMessage = {
+          id: `voice-${role}-${Date.now()}`,
+          content: text,
+          sender: role,
+          timestamp: createTimestamp()
+        };
+        dispatch(addLocalUserMessage(msg));
+        if (role === 'assistant') {
+          dispatch(setGeneratingResponse(false));
+        }
+        await saveVoiceMessage(sessionId, text, role);
+      });
   }, [currentSessionId, dispatch]);
 
   const toggleChat = useCallback(() => {
