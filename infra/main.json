@@ -6,7 +6,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.42.1.51946",
-      "templateHash": "17014778515214251023"
+      "templateHash": "11387055216723929134"
     }
   },
   "parameters": {
@@ -49,7 +49,6 @@
     "azureAiServiceLocation": {
       "type": "string",
       "allowedValues": [
-        "centralus",
         "eastus2",
         "francecentral",
         "swedencentral"
@@ -27297,9 +27296,9 @@
       },
       "dependsOn": [
         "aiFoundryAiServices",
-        "[format('avmPrivateDnsZones[{0}]', variables('dnsZoneIndex').openAI)]",
         "[format('avmPrivateDnsZones[{0}]', variables('dnsZoneIndex').cognitiveServices)]",
         "[format('avmPrivateDnsZones[{0}]', variables('dnsZoneIndex').aiServices)]",
+        "[format('avmPrivateDnsZones[{0}]', variables('dnsZoneIndex').openAI)]",
         "virtualNetwork"
       ]
     },
