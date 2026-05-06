@@ -31,7 +31,7 @@ import {
 } from '@/store/selectors';
 import { setChatOpen } from '@/store/slices/appSlice';
 import { fetchChatHistory } from '@/store/slices/chatHistorySlice';
-import { addLocalUserMessage, setGeneratingResponse } from '@/store/slices/chatSlice';
+import { addLocalUserMessage, setCurrentSessionId, setGeneratingResponse } from '@/store/slices/chatSlice';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
@@ -216,6 +216,7 @@ function App() {
             const sessionData = await createNewChatSession();
             sessionId = sessionData.session_id;
             saveCurrentSessionId(sessionId);
+            dispatch(setCurrentSessionId(sessionId));
           } catch {
             toast.error('Failed to start chat session');
             return;
