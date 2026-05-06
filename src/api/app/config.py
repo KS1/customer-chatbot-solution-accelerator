@@ -43,20 +43,14 @@ class Settings(BaseSettings):
 
     # Azure OpenAI
     azure_openai_endpoint: Optional[str] = None
+    azure_openai_api_key: Optional[str] = None
     azure_openai_api_version: str = "2025-01-01-preview"
     azure_openai_deployment_name: str = "gpt-4o-mini"
-
-    # Azure Key Vault
-    azure_key_vault_url: Optional[str] = None
 
     # Microsoft Entra ID
     azure_client_id: Optional[str] = None
     azure_client_secret: Optional[str] = None
     azure_tenant_id: Optional[str] = None
-
-    # Rate Limiting
-    rate_limit_requests: int = 100
-    rate_limit_window: int = 60  # seconds
 
     # Azure Search (for reference plugin)
     azure_search_endpoint: Optional[str] = None
@@ -69,9 +63,19 @@ class Settings(BaseSettings):
     foundry_chat_agent: str = ""
     foundry_product_agent: str = ""
     foundry_policy_agent: str = ""
-
-    # Feature Flags
-    use_foundry_agents: bool = False
+    # Azure Voice Live
+    azure_voicelive_endpoint: Optional[str] = None
+    azure_voicelive_api_key: Optional[str] = None
+    azure_voicelive_agent_name: str = ""  # Foundry agent name for native Voice Live
+    azure_voicelive_project: str = ""  # Foundry project name for native Voice Live
+    voicelive_mode: str = "model"
+    voicelive_model: str = "gpt-realtime-mini"
+    voicelive_voice: str = "en-US-Ava:DragonHDLatestNeural"
+    voicelive_transcribe_model: str = "gpt-4o-transcribe"
+    voicelive_instructions: str = "You are a helpful AI assistant."
+    voicelive_vad_threshold: float = 0.5
+    voicelive_vad_silence_ms: int = 1200
+    voicelive_vad_prefix_padding_ms: int = 300
 
     class Config:
         env_file = str(_env_file_path)  # Use absolute path to .env file
