@@ -384,7 +384,7 @@ jobs:
           if [ ! -z "${{ env.AI_SERVICES_NAME }}" ]; then
             echo "AI Services: ${{ env.AI_SERVICES_NAME }}"
             echo "Purging the AI Services Resource..."
-            if ! az resource delete --ids /subscriptions/${{ secrets.AZURE_SUBSCRIPTION_ID }}/providers/Microsoft.CognitiveServices/locations/${{ env.AZURE_LOCATION }}/resourceGroups/${{ env.RESOURCE_GROUP_NAME }}/deletedAccounts/${{ env.AI_SERVICES_NAME }} --verbose; then
+            if ! az resource delete --ids /subscriptions/${{ secrets.AZURE_SUBSCRIPTION_ID }}/providers/Microsoft.CognitiveServices/locations/${{ vars.AZURE_LOCATION }}/resourceGroups/${{ env.RESOURCE_GROUP_NAME }}/deletedAccounts/${{ env.AI_SERVICES_NAME }} --verbose; then
               echo "Failed to purge AI Services resource: ${{ env.AI_SERVICES_NAME }}"
             else
               echo "Purged the AI Services resource: ${{ env.AI_SERVICES_NAME }}"
