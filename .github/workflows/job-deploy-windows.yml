@@ -194,7 +194,7 @@ jobs:
 
       - name: Configure Parameters Based on WAF Setting
         shell: bash
-        env: 
+        env:
           INPUT_WAF_ENABLED: ${{ inputs.WAF_ENABLED }}
           INPUT_ENABLE_SCALABILITY: ${{ inputs.ENABLE_SCALABILITY }}
         run: |
@@ -216,6 +216,9 @@ jobs:
             fi
             mv "$tmpfile" infra/main.parameters.json
             echo "✅ enableScalability set to ${SCALABILITY_VALUE}"
+          else
+            echo "🔧 Configuring Non-WAF deployment - using default main.parameters.json..."
+          fi
       - name: Install azd
         uses: Azure/setup-azd@v2
 
