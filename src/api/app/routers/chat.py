@@ -353,6 +353,7 @@ async def send_message_legacy(
         chat_agent_name = settings.foundry_chat_agent
         product_agent_name = settings.foundry_product_agent
         policy_agent_name = settings.foundry_policy_agent
+        agent_provider_class = _get_agent_provider_class()
 
         # Validate Azure AI Foundry configuration before creating the client/provider
         if not ai_project_endpoint:
@@ -364,15 +365,16 @@ async def send_message_legacy(
                     "Please configure this setting to enable chat functionality."
                 ),
             )
-        missing_agent_settings = [
-            name
-            for value, name in [
-                (chat_agent_name, "foundry_chat_agent"),
-                (product_agent_name, "foundry_product_agent"),
-                (policy_agent_name, "foundry_policy_agent"),
-            ]
-            if not value
-        ]
+        required_agents = [(chat_agent_name, "foundry_chat_agent")]
+        if agent_provider_class is not None:
+            required_agents.extend(
+                [
+                    (product_agent_name, "foundry_product_agent"),
+                    (policy_agent_name, "foundry_policy_agent"),
+                ]
+            )
+
+        missing_agent_settings = [name for value, name in required_agents if not value]
         if missing_agent_settings:
             track_event_if_configured("Error_Config_Missing", {"settings": ", ".join(missing_agent_settings)})
             raise HTTPException(
@@ -390,7 +392,6 @@ async def send_message_legacy(
 
         client_id = str(settings.azure_client_id) if settings.azure_client_id else None
         credential = await get_azure_credential_async(client_id=client_id)
-        agent_provider_class = _get_agent_provider_class()
 
         async with (
             credential,

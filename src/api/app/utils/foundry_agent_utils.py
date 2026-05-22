@@ -40,11 +40,21 @@ async def call_foundry_agent(
         if not foundry_endpoint:
             return "Foundry endpoint not configured."
 
-        if not all([chat_agent_name, product_agent_name, policy_agent_name]):
+        agent_provider_class = _get_agent_provider_class()
+
+        required_agents = [(chat_agent_name, "foundry_chat_agent")]
+        if agent_provider_class is not None:
+            required_agents.extend(
+                [
+                    (product_agent_name, "foundry_product_agent"),
+                    (policy_agent_name, "foundry_policy_agent"),
+                ]
+            )
+
+        if not all(agent_name for agent_name, _ in required_agents):
             return "Foundry agents not fully configured."
 
         credential = await get_azure_credential_async(client_id=azure_client_id)
-        agent_provider_class = _get_agent_provider_class()
 
         async with (
             credential,

@@ -4,7 +4,7 @@ import os
 
 try:
     track_event = importlib.import_module("azure.monitor.events.extension").track_event
-except ModuleNotFoundError:
+except (ImportError, AttributeError):
     track_event = None
 
 logger = logging.getLogger(__name__)

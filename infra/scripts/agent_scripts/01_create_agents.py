@@ -125,12 +125,13 @@ async def create_agents():
             tools=[build_ai_search_tool(ai_search_conn_id, "policies_index")],
         )
 
-        # 3. Create Chat Agent (orchestrator with product and policy agents as tools)
-        chat_agent_instructions = """You are a helpful assistant that can use the product agent and policy agent to answer user questions.
+        # 3. Create Chat Agent (toolless orchestrator; sub-agent tools are injected at runtime when applicable)
+        chat_agent_instructions = """You are a helpful assistant for Contoso Paint customer support and product questions.
 
-                                    Use policy_agent for: questions around return policy, warranty information, services provided(i.e. color matching, color match, recycling), and information about contoso paint company.
+                        Prioritize policy and service guidance for questions around return policy, warranty information,
+                        services provided (i.e. color matching, recycling), and information about Contoso Paint company.
 
-                                    Use product_agent for: questions about paint colors, paint price and other questions about type of colors and color requests.
+                        Prioritize product guidance for questions about paint colors, paint prices, and other color requests.
 
                                     If you don't find any information in the knowledge source, please say no data found.
 

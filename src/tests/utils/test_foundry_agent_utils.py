@@ -24,14 +24,14 @@ async def test_foundry_agent_empty_endpoint():
 
 @pytest.mark.asyncio
 async def test_foundry_agent_missing_agent_names():
-    """Returns error when any agent name is missing."""
+    """Returns error when required chat agent name is missing."""
     from app.utils.foundry_agent_utils import call_foundry_agent
 
     result = await call_foundry_agent(
         question="What colors?",
         foundry_endpoint="https://foundry.test",
-        chat_agent_name="chat",
-        product_agent_name="",
+        chat_agent_name="",
+        product_agent_name="product",
         policy_agent_name="policy",
     )
     assert "not fully configured" in result.lower()
