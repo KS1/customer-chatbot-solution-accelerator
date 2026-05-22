@@ -7,6 +7,16 @@ from typing import Optional
 logger = logging.getLogger(__name__)
 
 
+def _get_agent_provider_class():
+    """Resolve provider class across Agent Framework package transitions."""
+    try:
+        from agent_framework.azure import AzureAIProjectAgentProvider
+
+        return AzureAIProjectAgentProvider
+    except ImportError:
+        return None
+
+
 async def call_foundry_agent(
     question: str,
     foundry_endpoint: str,
@@ -20,7 +30,6 @@ async def call_foundry_agent(
     Returns the grounded text response.
     """
     try:
-        from agent_framework_azure_ai import AzureAIProjectAgentProvider
         from azure.ai.projects.aio import AIProjectClient
 
         try:
@@ -35,27 +44,38 @@ async def call_foundry_agent(
             return "Foundry agents not fully configured."
 
         credential = await get_azure_credential_async(client_id=azure_client_id)
+        agent_provider_class = _get_agent_provider_class()
 
         async with (
             credential,
             AIProjectClient(endpoint=foundry_endpoint, credential=credential) as project_client,
-            AzureAIProjectAgentProvider(
-                project_client=project_client,
-                credential=credential,
-            ) as provider,
         ):
-            product_agent = await provider.get_agent(name=product_agent_name)
-            policy_agent = await provider.get_agent(name=policy_agent_name)
+            if agent_provider_class is not None:
+                async with agent_provider_class(
+                    project_client=project_client,
+                    credential=credential,
+                ) as provider:
+                    product_agent = await provider.get_agent(name=product_agent_name)
+                    policy_agent = await provider.get_agent(name=policy_agent_name)
 
-            retrieved_agent = await provider.get_agent(
-                name=chat_agent_name,
-                tools=[
-                    product_agent.as_tool(name="product_agent"),
-                    policy_agent.as_tool(name="policy_agent"),
-                ],
-            )
+                    retrieved_agent = await provider.get_agent(
+                        name=chat_agent_name,
+                        tools=[
+                            product_agent.as_tool(name="product_agent"),
+                            policy_agent.as_tool(name="policy_agent"),
+                        ],
+                    )
 
-            result = await retrieved_agent.run(question)
+                    result = await retrieved_agent.run(question)
+            else:
+                from agent_framework.foundry import FoundryAgent
+
+                async with FoundryAgent(
+                    project_endpoint=foundry_endpoint,
+                    agent_name=chat_agent_name,
+                    credential=credential,
+                ) as chat_agent:
+                    result = await chat_agent.run(question)
 
             if result and hasattr(result, "text"):
                 return result.text
