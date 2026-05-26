@@ -339,8 +339,12 @@ jobs:
               return
             fi
 
-            TIER_USAGE=$(echo "$SEARCH_USAGE" | jq -r --arg tier "$SEARCH_TIER" '.value[] | select(.name.value == $tier) | .currentValue // 0')
-            TIER_LIMIT=$(echo "$SEARCH_USAGE" | jq -r --arg tier "$SEARCH_TIER" '.value[] | select(.name.value == $tier) | .limit // 0')
+            # Wrap in array + `first // 0` so missing tier entries yield 0 (not empty string).
+            # Also guard with ${var:-0} to avoid arithmetic errors if jq returns null/empty.
+            TIER_USAGE=$(echo "$SEARCH_USAGE" | jq -r --arg tier "$SEARCH_TIER" '[.value[] | select(.name.value == $tier) | .currentValue] | first // 0')
+            TIER_LIMIT=$(echo "$SEARCH_USAGE" | jq -r --arg tier "$SEARCH_TIER" '[.value[] | select(.name.value == $tier) | .limit] | first // 0')
+            TIER_USAGE=${TIER_USAGE:-0}
+            TIER_LIMIT=${TIER_LIMIT:-0}
             TIER_AVAILABLE=$((TIER_LIMIT - TIER_USAGE))
             echo "   $SEARCH_TIER_DISPLAY Tier: Used=$TIER_USAGE | Limit=$TIER_LIMIT | Available=$TIER_AVAILABLE"
           }
@@ -402,9 +406,9 @@ jobs:
           else
             # ─── AUTOMATIC TRIGGER ───
             # Iterate allowed regions; pick the first with available capacity.
-            echo "📋 Automatic trigger: checking allowed regions from GitHub variable AZURE_REGIONS"
+            echo "📋 Automatic trigger: checking allowed regions from GitHub variable AZURE_NONAI_LOCATIONS"
             if [ ${#ALLOWED_REGIONS[@]} -eq 0 ]; then
-              echo "❌ ERROR: GitHub variable 'AZURE_REGIONS' is empty. Cannot determine regions to check."
+              echo "❌ ERROR: GitHub variable 'AZURE_NONAI_LOCATIONS' is empty. Cannot determine regions to check."
               exit 1
             fi
             echo "🔍 Checking Azure Search $SEARCH_TIER_DISPLAY tier quota across regions: ${ALLOWED_REGIONS[*]}"
@@ -483,7 +487,7 @@ jobs:
 
             echo "## ❌ Azure Search Quota Check Failed" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
-            echo "No region in \`AZURE_REGIONS\` has sufficient Azure Search **$SEARCH_TIER_DISPLAY** tier quota." >> $GITHUB_STEP_SUMMARY
+            echo "No region in \`AZURE_NONAI_LOCATIONS\` has sufficient Azure Search **$SEARCH_TIER_DISPLAY** tier quota." >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "| Region | Status |" >> $GITHUB_STEP_SUMMARY
             echo "|--------|--------|" >> $GITHUB_STEP_SUMMARY
