@@ -83,7 +83,11 @@ async def test_foundry_agent_success_with_text():
     mock_ai_projects = MagicMock()
     mock_ai_projects.AIProjectClient = MagicMock(return_value=mock_project_client)
 
+    mock_parent_framework = MagicMock()
+    mock_parent_framework.__path__ = []
+
     with patch.dict(sys.modules, {
+        "agent_framework": mock_parent_framework,
         "agent_framework.azure": mock_framework,
         "azure.ai.projects.aio": mock_ai_projects,
     }), patch("app.utils.azure_credential_utils.get_azure_credential_async", new_callable=AsyncMock) as mock_get_cred:
@@ -130,7 +134,11 @@ async def test_foundry_agent_success_str_result():
     mock_ai_projects = MagicMock()
     mock_ai_projects.AIProjectClient = MagicMock(return_value=mock_project_client)
 
+    mock_parent_framework = MagicMock()
+    mock_parent_framework.__path__ = []
+
     with patch.dict(sys.modules, {
+        "agent_framework": mock_parent_framework,
         "agent_framework.azure": mock_framework,
         "azure.ai.projects.aio": mock_ai_projects,
     }), patch("app.utils.azure_credential_utils.get_azure_credential_async", new_callable=AsyncMock) as mock_get_cred:
@@ -174,7 +182,11 @@ async def test_foundry_agent_none_result():
     mock_ai_projects = MagicMock()
     mock_ai_projects.AIProjectClient = MagicMock(return_value=mock_project_client)
 
+    mock_parent_framework = MagicMock()
+    mock_parent_framework.__path__ = []
+
     with patch.dict(sys.modules, {
+        "agent_framework": mock_parent_framework,
         "agent_framework.azure": mock_framework,
         "azure.ai.projects.aio": mock_ai_projects,
     }), patch("app.utils.azure_credential_utils.get_azure_credential_async", new_callable=AsyncMock) as mock_get_cred:
@@ -203,7 +215,11 @@ async def test_foundry_agent_exception():
     mock_framework = MagicMock()
     mock_ai_projects = MagicMock()
 
+    mock_parent_framework = MagicMock()
+    mock_parent_framework.__path__ = []
+
     with patch.dict(sys.modules, {
+        "agent_framework": mock_parent_framework,
         "agent_framework.azure": mock_framework,
         "azure.ai.projects.aio": mock_ai_projects,
     }), patch("app.utils.azure_credential_utils.get_azure_credential_async", new_callable=AsyncMock) as mock_get_cred:

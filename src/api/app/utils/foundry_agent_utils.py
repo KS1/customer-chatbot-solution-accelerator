@@ -26,7 +26,12 @@ async def call_foundry_agent(
     azure_client_id: Optional[str] = None,
 ) -> str:
     """
-    Call the Foundry multi-agent pipeline (chat → product/policy agents → Azure AI Search).
+    Call the Foundry agent pipeline for grounded enterprise answers.
+
+    When AzureAIProjectAgentProvider is available, uses the full multi-agent pipeline
+    (chat → product/policy agents → Azure AI Search). Otherwise, falls back to a single
+    FoundryAgent call using only the chat agent (without product/policy sub-agents).
+
     Returns the grounded text response.
     """
     try:
