@@ -54,11 +54,12 @@ class WebUserPage(BasePage):
         stop_btn = self.page.locator(self.STOP_GENERATING_LABEL)
         try:
             stop_btn.wait_for(state="visible", timeout=15000)
-        except Exception:
+        except PlaywightTimeoutError:
+            # Short replies may never render the stop button; continue.
             pass
         try:
             stop_btn.wait_for(state="hidden", timeout=timeout)
-        except Exception:
+        except PlaywightTimeoutError:
             pass
         
         # Wait for AI response to appear by looking for response indicators
@@ -268,19 +269,32 @@ class WebUserPage(BasePage):
         return response, contains_keyword, found_keyword
 
     def get_new_ai_response(self, initial_count):
-        """Return the text of the newly appended AI response bubble."""
+        """Return the text of the newly appended AI response bubble.
+
+        Deterministic: retries reading the last bubble at index >= initial_count.
+        Does NOT fall back to the heuristic extractor on failure, because that
+        path is not parameterized by initial_count and could return a stale
+        prior bubble (the original bug this fix targets). On persistent failure
+        returns an empty string so the calling assertion fails with the actual
+        question text and diagnostic info.
+        """
         import re
         bubbles = self.page.locator('div[class*="bg-muted"]')
-        total = bubbles.count()
-        if total > initial_count:
-            try:
-                text = bubbles.nth(total - 1).text_content() or ""
-                cleaned = re.sub(r'\s+', ' ', text).strip()
-                if cleaned:
-                    return cleaned
-            except Exception:
-                pass
-        return self.get_latest_ai_response()
+        # Retry to absorb brief re-renders / hydration gaps.
+        for _ in range(5):
+            total = bubbles.count()
+            if total > initial_count:
+                try:
+                    text = bubbles.nth(total - 1).text_content() or ""
+                    cleaned = re.sub(r'\s+', ' ', text).strip()
+                    if cleaned:
+                        return cleaned
+                except PlaywightTimeoutError:
+                    pass
+                except Exception:
+                    pass
+            self.page.wait_for_timeout(1000)
+        return ""
     
     def get_latest_ai_response(self):
         """Get the text content of the LATEST/MOST RECENT AI response only"""

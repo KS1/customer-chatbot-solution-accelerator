@@ -61,8 +61,11 @@ class TestBYOCCGoldenPath:
         # Step 1: Open chat window
         logger.info("Opening chat window...")
         web_user_page.open_chat_window()
-        # Warm-up for cold-started Azure Web App backend.
-        page.wait_for_timeout(5000)
+        # Warm-up for cold-started Azure Web App backend. Configurable so warm
+        # environments can set E2E_WARMUP_MS=0 to skip this delay.
+        warmup_ms = int(os.getenv("E2E_WARMUP_MS", "5000"))
+        if warmup_ms > 0:
+            page.wait_for_timeout(warmup_ms)
         
         # Take screenshot after opening chat
         self._take_screenshot(page, "02_chat_opened")
