@@ -1,10 +1,14 @@
 """
 Foundry agent utilities — call the multi-agent pipeline for grounded enterprise answers.
 """
+import json
 import logging
-from typing import Optional
+from typing import Any, Optional, Tuple
 
 logger = logging.getLogger(__name__)
+
+# Sub-agent tools baked into the chat agent definition.
+_SUBAGENT_TOOL_NAMES = {"product_agent", "policy_agent"}
 
 
 def _get_agent_provider_class():
@@ -15,6 +19,81 @@ def _get_agent_provider_class():
         return AzureAIProjectAgentProvider
     except ImportError:
         return None
+
+
+def _result_text(result: Any) -> str:
+    """Extract plain text from an Agent Framework run result."""
+    if result is None:
+        return ""
+    text = getattr(result, "text", None)
+    if text:
+        return text
+    return str(result)
+
+
+def _extract_subagent_call(result: Any) -> Optional[Tuple[str, str]]:
+    """Return (sub_agent_tool_name, task) if the chat agent emitted a sub-agent call, else None."""
+    messages = getattr(result, "messages", None) or []
+    for message in messages:
+        for content in getattr(message, "contents", None) or []:
+            if getattr(content, "type", None) != "function_call":
+                continue
+            name = getattr(content, "name", None)
+            if name not in _SUBAGENT_TOOL_NAMES:
+                continue
+            task = ""
+            raw_args = getattr(content, "arguments", None)
+            if raw_args:
+                try:
+                    parsed = json.loads(raw_args) if isinstance(raw_args, str) else raw_args
+                    if isinstance(parsed, dict):
+                        task = parsed.get("task") or parsed.get("query") or ""
+                except (ValueError, TypeError):
+                    task = ""
+            return name, task
+    return None
+
+
+async def _run_foundry_chat_with_routing(
+    foundry_endpoint: str,
+    chat_agent_name: str,
+    product_agent_name: str,
+    policy_agent_name: str,
+    question: str,
+    credential: Any,
+) -> str:
+    """Run the chat agent, then execute the grounded sub-agent it routes to (if any)."""
+    from agent_framework.foundry import FoundryAgent
+
+    tool_to_agent_name = {
+        "product_agent": product_agent_name,
+        "policy_agent": policy_agent_name,
+    }
+
+    async with FoundryAgent(
+        project_endpoint=foundry_endpoint,
+        agent_name=chat_agent_name,
+        credential=credential,
+    ) as chat_agent:
+        result = await chat_agent.run(question)
+
+    call = _extract_subagent_call(result)
+    if call is None:
+        return _result_text(result)
+
+    tool_name, task = call
+    target_agent_name = tool_to_agent_name.get(tool_name)
+    if not target_agent_name:
+        return _result_text(result)
+
+    async with FoundryAgent(
+        project_endpoint=foundry_endpoint,
+        agent_name=target_agent_name,
+        credential=credential,
+    ) as sub_agent:
+        sub_result = await sub_agent.run(task or question)
+
+    return _result_text(sub_result)
 
 
 async def call_foundry_agent(
@@ -83,14 +162,15 @@ async def call_foundry_agent(
 
                     result = await retrieved_agent.run(question)
             else:
-                from agent_framework.foundry import FoundryAgent
-
-                async with FoundryAgent(
-                    project_endpoint=foundry_endpoint,
-                    agent_name=chat_agent_name,
+                grounded_text = await _run_foundry_chat_with_routing(
+                    foundry_endpoint=foundry_endpoint,
+                    chat_agent_name=chat_agent_name,
+                    product_agent_name=product_agent_name,
+                    policy_agent_name=policy_agent_name,
+                    question=question,
                     credential=credential,
-                ) as chat_agent:
-                    result = await chat_agent.run(question)
+                )
+                return grounded_text or "No response from the agent."
 
             if result and hasattr(result, "text"):
                 return result.text
