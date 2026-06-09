@@ -718,15 +718,16 @@ export const EnhancedChatPanel = ({
     };
 
     ws.onerror = () => {
-      // Connection failed before `session_started` — cancel the cold-start
-      // timeout so it can't fire after we've already transitioned to idle.
+      // Cancel the cold-start timeout so it can't fire after teardown.
       if (connectTimeoutRef.current) {
         clearTimeout(connectTimeoutRef.current);
         connectTimeoutRef.current = null;
       }
       setVoiceError('Unable to connect to Voice Live. Check backend and Voice Live settings.');
-      setIsVoiceTransitioning(false);
-      setVoiceSessionState('idle');
+      // Centralize teardown: `onerror` may fire after `session_started`, so
+      // mic capture / audio playback refs may already be live. Delegate to
+      // stopVoiceSession() instead of duplicating cleanup here.
+      void stopVoiceSession();
     };
 
     ws.onclose = async () => {

@@ -88,18 +88,32 @@ const chatSlice = createSlice({
         // (e.g. voice assistant reply) isn't wiped by a racing fetch.
         // Dedupe by (sender, content) within a short timestamp window since
         // local IDs (user-<ts>, voice-*) never match server-assigned IDs.
+        // Match is 1:1 — a single server message consumes only one local
+        // duplicate so legitimately repeated messages aren't all filtered.
         const DUP_WINDOW_MS = 60_000;
         const tsOf = (t: string) => {
           const n = new Date(t).getTime();
           return Number.isNaN(n) ? 0 : n;
         };
-        const isSame = (a: ChatMessage, b: ChatMessage) =>
-          a.sender === b.sender
-          && a.content === b.content
-          && Math.abs(tsOf(a.timestamp) - tsOf(b.timestamp)) < DUP_WINDOW_MS;
-        const localOnly = state.messages.filter(
-          (local) => !action.payload.messages.some((server) => isSame(local, server)),
-        );
+        const remainingServer = action.payload.messages.map((m) => ({
+          msg: m,
+          ts: tsOf(m.timestamp),
+          consumed: false,
+        }));
+        const localOnly = state.messages.filter((local) => {
+          const localTs = tsOf(local.timestamp);
+          const match = remainingServer.find(
+            (s) => !s.consumed
+              && s.msg.sender === local.sender
+              && s.msg.content === local.content
+              && Math.abs(s.ts - localTs) < DUP_WINDOW_MS,
+          );
+          if (match) {
+            match.consumed = true;
+            return false;
+          }
+          return true;
+        });
         const merged = [...action.payload.messages, ...localOnly];
         merged.sort((a, b) => tsOf(a.timestamp) - tsOf(b.timestamp));
         state.messages = merged;
