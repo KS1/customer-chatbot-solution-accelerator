@@ -477,7 +477,7 @@ export const EnhancedChatPanel = ({
       connectTimeoutRef.current = null;
       if (!sessionReadyRef.current) {
         setVoiceError('Voice connection timed out. Please try again.');
-        stopVoiceSession();
+        void stopVoiceSession();
       }
     }, 30_000);
 
@@ -685,8 +685,16 @@ export const EnhancedChatPanel = ({
             connectTimeoutRef.current = null;
           }
           sessionReadyRef.current = true;
+          // Capture the WS at this moment so we can detect if the session was
+          // torn down while `getUserMedia()` was pending and tear the mic back
+          // down immediately.
+          const wsAtStart = wsRef.current;
           startMicrophoneCapture()
             .then(() => {
+              if (wsRef.current !== wsAtStart || !sessionReadyRef.current) {
+                void stopMicrophoneCapture();
+                return;
+              }
               setIsVoiceActive(true);
               setVoiceSessionState('listening');
               setVoiceError(null);
@@ -710,12 +718,23 @@ export const EnhancedChatPanel = ({
     };
 
     ws.onerror = () => {
+      // Connection failed before `session_started` — cancel the cold-start
+      // timeout so it can't fire after we've already transitioned to idle.
+      if (connectTimeoutRef.current) {
+        clearTimeout(connectTimeoutRef.current);
+        connectTimeoutRef.current = null;
+      }
       setVoiceError('Unable to connect to Voice Live. Check backend and Voice Live settings.');
       setIsVoiceTransitioning(false);
       setVoiceSessionState('idle');
     };
 
     ws.onclose = async () => {
+      // Cancel cold-start timeout if the socket closed before `session_started`.
+      if (connectTimeoutRef.current) {
+        clearTimeout(connectTimeoutRef.current);
+        connectTimeoutRef.current = null;
+      }
       // If we were still waiting for an assistant response, the connection
       // dropped before the answer arrived — notify the user.
       if (awaitingResponseRef.current) {

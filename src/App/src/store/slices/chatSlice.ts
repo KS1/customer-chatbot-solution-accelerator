@@ -86,19 +86,22 @@ const chatSlice = createSlice({
         state.currentSessionId = action.payload.sessionId;
         // Merge server + local optimistic messages so an in-flight save
         // (e.g. voice assistant reply) isn't wiped by a racing fetch.
-        const serverIds = new Set(
-          action.payload.messages.map((m) => m.id).filter(Boolean),
-        );
+        // Dedupe by (sender, content) within a short timestamp window since
+        // local IDs (user-<ts>, voice-*) never match server-assigned IDs.
+        const DUP_WINDOW_MS = 60_000;
+        const tsOf = (t: string) => {
+          const n = new Date(t).getTime();
+          return Number.isNaN(n) ? 0 : n;
+        };
+        const isSame = (a: ChatMessage, b: ChatMessage) =>
+          a.sender === b.sender
+          && a.content === b.content
+          && Math.abs(tsOf(a.timestamp) - tsOf(b.timestamp)) < DUP_WINDOW_MS;
         const localOnly = state.messages.filter(
-          (m) => m.id && !serverIds.has(m.id),
+          (local) => !action.payload.messages.some((server) => isSame(local, server)),
         );
         const merged = [...action.payload.messages, ...localOnly];
-        merged.sort((a, b) => {
-          const ta = new Date(a.timestamp).getTime();
-          const tb = new Date(b.timestamp).getTime();
-          if (Number.isNaN(ta) || Number.isNaN(tb)) return 0;
-          return ta - tb;
-        });
+        merged.sort((a, b) => tsOf(a.timestamp) - tsOf(b.timestamp));
         state.messages = merged;
       })
       .addCase(fetchConversationMessages.rejected, (state) => {
