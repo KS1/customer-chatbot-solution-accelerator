@@ -7,6 +7,7 @@ from azure.ai.projects.models import (
     AzureAISearchTool,
     AzureAISearchToolResource,
     ConnectionType,
+    FunctionTool,
     PromptAgentDefinition,
 )
 from azure.identity.aio import AzureCliCredential
@@ -42,6 +43,25 @@ def build_ai_search_tool(project_connection_id: str, index_name: str) -> AzureAI
                 )
             ]
         )
+    )
+
+
+def build_subagent_tool(tool_name: str, description: str) -> FunctionTool:
+    """Build a function tool the chat agent uses to delegate to a grounded sub-agent."""
+    return FunctionTool(
+        name=tool_name,
+        description=description,
+        parameters={
+            "type": "object",
+            "properties": {
+                "task": {
+                    "type": "string",
+                    "description": f"The user's question to forward to {tool_name}",
+                }
+            },
+            "required": ["task"],
+            "additionalProperties": False,
+        },
     )
 
 
@@ -125,13 +145,14 @@ async def create_agents():
             tools=[build_ai_search_tool(ai_search_conn_id, "policies_index")],
         )
 
-        # 3. Create Chat Agent (toolless orchestrator; sub-agent tools are injected at runtime when applicable)
-        chat_agent_instructions = """You are a helpful assistant for Contoso Paint customer support and product questions.
+        # 3. Create Chat Agent — delegates to product/policy sub-agents via function tools.
+        chat_agent_instructions = """You are a helpful assistant that can use the product agent and policy agent to answer user questions.
 
-                        Prioritize policy and service guidance for questions around return policy, warranty information,
-                        services provided (i.e. color matching, recycling), and information about Contoso Paint company.
+                                    Use policy_agent for: questions around return policy, warranty information, services provided(i.e. color matching, color match, recycling), and information about contoso paint company.
 
-                        Prioritize product guidance for questions about paint colors, paint prices, and other color requests.
+                                    Use product_agent for: questions about paint colors, paint price and other questions about type of colors and color requests.
+
+                                    ALWAYS call product_agent or policy_agent to answer product, color, price, policy, warranty, or service questions — never answer these from your own knowledge, and never make up products, prices, or image URLs.
 
                                     If you don't find any information in the knowledge source, please say no data found.
 
@@ -157,7 +178,16 @@ async def create_agents():
             name=f"chat-agent-{solutionName}",
             model=gptModelName,
             instructions=chat_agent_instructions,
-            tools=None,  # Orchestrator: delegates to product/policy sub-agents; no direct search tools
+            tools=[
+                build_subagent_tool(
+                    "product_agent",
+                    "Delegate paint product, color, and price questions to the grounded product agent.",
+                ),
+                build_subagent_tool(
+                    "policy_agent",
+                    "Delegate return policy, warranty, services, and company-info questions to the grounded policy agent.",
+                ),
+            ],
         )
 
         # Return agent names

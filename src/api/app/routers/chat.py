@@ -422,14 +422,16 @@ async def send_message_legacy(
                     return await retrieved_agent.run(message.content)
 
             async def _run_with_foundry_agent() -> Any:
-                from agent_framework.foundry import FoundryAgent
+                from ..utils.foundry_agent_utils import _run_foundry_chat_with_routing
 
-                async with FoundryAgent(
-                    project_endpoint=ai_project_endpoint,
-                    agent_name=chat_agent_name,
+                return await _run_foundry_chat_with_routing(
+                    foundry_endpoint=ai_project_endpoint,
+                    chat_agent_name=chat_agent_name,
+                    product_agent_name=product_agent_name,
+                    policy_agent_name=policy_agent_name,
+                    question=message.content,
                     credential=credential,
-                ) as chat_agent:
-                    return await chat_agent.run(message.content)
+                )
 
             for attempt in range(max_retries):
                 try:
