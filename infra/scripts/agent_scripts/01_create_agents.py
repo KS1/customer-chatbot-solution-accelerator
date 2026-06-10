@@ -146,13 +146,13 @@ async def create_agents():
         )
 
         # 3. Create Chat Agent — delegates to product/policy sub-agents via function tools.
-        chat_agent_instructions = """You are a helpful assistant for Contoso Paint customer support and product questions.
+        chat_agent_instructions = """You are a helpful assistant that can use the product agent and policy agent to answer user questions.
 
-                        You have two tools:
-                        - product_agent: use it for questions about paint colors, paint products, paint prices, and other color requests.
-                        - policy_agent: use it for questions about return policy, warranty information, services provided (e.g. color matching, recycling), and information about the Contoso Paint company.
+                                    Use policy_agent for: questions around return policy, warranty information, services provided(i.e. color matching, color match, recycling), and information about contoso paint company.
 
-                        ALWAYS call product_agent or policy_agent to answer product, color, price, policy, warranty, or service questions — never answer these from your own knowledge, and never make up products, prices, or image URLs. Pass the user's question as the 'task' argument.
+                                    Use product_agent for: questions about paint colors, paint price and other questions about type of colors and color requests.
+
+                                    ALWAYS call product_agent or policy_agent to answer product, color, price, policy, warranty, or service questions — never answer these from your own knowledge, and never make up products, prices, or image URLs.
 
                                     If you don't find any information in the knowledge source, please say no data found.
 
