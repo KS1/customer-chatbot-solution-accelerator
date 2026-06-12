@@ -179,8 +179,18 @@ enable_public_access() {
 			ip_rules="${ip_rules}]"
 		else
 			echo "Getting current IP address..."
-			current_ip=$(curl -s https://ipinfo.io/ip)
+			current_ip=$(curl -s --fail --max-time 10 https://ipinfo.io/ip)
+			current_ip="$(echo "$current_ip" | tr -d '[:space:]')"
 			echo "Current IP: $current_ip"
+
+			# Validate the detected IP is a well-formed IPv4 address before using it in
+			# arithmetic/firewall rules. Behind a proxy/VPN curl may return an empty body,
+			# an error page, or an IPv6 address, which would corrupt the ip_rules JSON.
+			if ! [[ "$current_ip" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
+				echo "Error: Could not auto-detect a valid IPv4 public IP (got: '$current_ip')." >&2
+				echo "  Set COSMOS_FIREWALL_IP to an explicit IP/CIDR (or comma-separated list) and re-run." >&2
+				exit 1
+			fi
 
 			# Build array of individual IPs to handle NAT/proxy variations (current IP ±2)
 			IFS='.' read -r ip1 ip2 ip3 ip4 <<< "$current_ip"
@@ -703,7 +713,12 @@ while true; do
 			retry_rules="${retry_rules}{\"ipAddressOrRange\":\"${blocked_ip}\"}"
 		fi
 		retry_rules="${retry_rules}]"
-		MSYS_NO_PATHCONV=1 az resource update --ids "$cosmos_resource_id" --api-version 2021-04-15 --set "properties.ipRules=$retry_rules" --set "properties.publicNetworkAccess=Enabled" --output none 2>/dev/null
+		update_err=$(MSYS_NO_PATHCONV=1 az resource update --ids "$cosmos_resource_id" --api-version 2021-04-15 --set "properties.ipRules=$retry_rules" --set "properties.publicNetworkAccess=Enabled" --output none 2>&1)
+		if [ $? -ne 0 ]; then
+			echo "Error: Failed to add blocked IP $blocked_ip to the Cosmos DB firewall. Aborting retries." >&2
+			echo "$update_err" >&2
+			break
+		fi
 		echo "Waiting for Cosmos DB network changes to take effect (30 seconds)..."
 		sleep 30
 		upload_attempt=$((upload_attempt + 1))

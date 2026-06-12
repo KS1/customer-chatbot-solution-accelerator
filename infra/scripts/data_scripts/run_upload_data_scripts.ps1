@@ -450,6 +450,9 @@ if ($originalCosmosPublicAccess -eq "Enabled") {
     # Add the detected/override IP(s) to firewall rules and enable public network access.
     # Supports a comma-separated list of IPs/CIDRs via COSMOS_FIREWALL_IP.
     $cosmosIpList = @($currentIp -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+    if ($cosmosIpList.Count -eq 0) {
+        throw "Could not determine an IP to whitelist for the Cosmos DB firewall (auto-detection failed and COSMOS_FIREWALL_IP is not set). Set COSMOS_FIREWALL_IP to an explicit IP/CIDR (or comma-separated list) and re-run. Refusing to enable public access with an empty firewall rule set."
+    }
     Write-Host "Adding IP(s) to Cosmos DB firewall: $($cosmosIpList -join ', ')"
     $ipRuleJson = "[" + (($cosmosIpList | ForEach-Object { "{\`"ipAddressOrRange\`":\`"$_\`"}" }) -join ",") + "]"
     
@@ -497,7 +500,10 @@ try {
             if ($existingIps) { $ipList = @($existingIps -split "\r?\n" | Where-Object { $_ }) }
             if ($ipList -notcontains $blockedIp) { $ipList += $blockedIp }
             $retryIpRuleJson = "[" + (($ipList | ForEach-Object { "{\`"ipAddressOrRange\`":\`"$_\`"}" }) -join ",") + "]"
-            az resource update --ids $cosmos_resource_id --api-version 2021-04-15 --set "properties.ipRules=$retryIpRuleJson" --set "properties.publicNetworkAccess=Enabled" --output none 2>$null
+            $updateError = az resource update --ids $cosmos_resource_id --api-version 2021-04-15 --set "properties.ipRules=$retryIpRuleJson" --set "properties.publicNetworkAccess=Enabled" --output none 2>&1
+            if ($LASTEXITCODE -ne 0) {
+                throw "Failed to add blocked IP $blockedIp to the Cosmos DB firewall (az resource update exit code $LASTEXITCODE): $updateError"
+            }
             $cosmosAccessEnabled = $true
             Write-Host "Waiting for Cosmos DB network changes to take effect (30 seconds)..."
             Start-Sleep -Seconds 30
