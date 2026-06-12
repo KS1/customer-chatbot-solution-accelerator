@@ -278,21 +278,26 @@ jobs:
       
       - name: Run Quota Check
         id: quota-check
+        shell: bash
         env:
           AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-          AZURE_REGIONS: ${{ vars.AZURE_REGIONS }}
+          INPUT_TRIGGER_TYPE: ${{ inputs.trigger_type }}
+          INPUT_AZURE_LOCATION: ${{ inputs.azure_location }}
+          AZURE_REGIONS_FALLBACK: ${{ vars.AZURE_REGIONS }}
           GPT_MIN_CAPACITY: ${{ env.GPT_MIN_CAPACITY }}
           GPT_REALTIME_MIN_CAPACITY: ${{ env.GPT_REALTIME_MIN_CAPACITY }}
         run: |
+          set -euo pipefail
+          if [[ "$INPUT_TRIGGER_TYPE" == "workflow_dispatch" && -n "$INPUT_AZURE_LOCATION" ]]; then
+            export AZURE_REGIONS="$INPUT_AZURE_LOCATION"
+            echo "📋 Manual trigger: validating AI quota only for user-selected region '$INPUT_AZURE_LOCATION'"
+          else
+            export AZURE_REGIONS="$AZURE_REGIONS_FALLBACK"
+            echo "📋 Automatic trigger: validating AI quota across configured regions '$AZURE_REGIONS'"
+          fi
 
           chmod +x infra/scripts/checkquota.sh
-          if ! infra/scripts/checkquota.sh; then
-            # If quota check fails due to insufficient quota, set the flag
-            if grep -q "No region with sufficient quota found" infra/scripts/checkquota.sh; then
-              echo "QUOTA_FAILED=true" >> $GITHUB_ENV
-            fi
-            exit 1  # Fail the pipeline if any other failure occurs
-          fi
+          infra/scripts/checkquota.sh
 
       - name: Set Quota Failure Output
         id: quota_failure_output
