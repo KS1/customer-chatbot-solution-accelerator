@@ -711,12 +711,15 @@ while true; do
 	if [ -n "$blocked_ip" ] && [ $upload_attempt -lt $max_upload_attempts ]; then
 		echo "Cosmos DB firewall blocked actual egress IP $blocked_ip - adding it and retrying (attempt $upload_attempt of $max_upload_attempts)..."
 		existing_ips=$(MSYS_NO_PATHCONV=1 az resource show --ids "$cosmos_resource_id" --api-version 2021-04-15 --query "properties.ipRules[].ipAddressOrRange" --output tsv 2>/dev/null)
-		if [ $? -ne 0 ]; then
+		existing_ips_rc=$?
+		if [ $existing_ips_rc -ne 0 ]; then
 			echo "Error: Failed to read existing Cosmos DB firewall rules; aborting recovery to avoid overwriting them." >&2
 			break
 		fi
+		existing_ips=$(printf '%s' "$existing_ips" | tr -d '\r')
 		retry_rules="["
 		while IFS= read -r _eip; do
+			_eip="$(echo "$_eip" | tr -d '[:space:]')"
 			[ -z "$_eip" ] && continue
 			if [ "$retry_rules" != "[" ]; then retry_rules="${retry_rules},"; fi
 			retry_rules="${retry_rules}{\"ipAddressOrRange\":\"${_eip}\"}"
