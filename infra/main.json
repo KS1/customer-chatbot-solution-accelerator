@@ -5,8 +5,8 @@
   "metadata": {
     "_generator": {
       "name": "bicep",
-      "version": "0.43.8.12551",
-      "templateHash": "996438699371597328"
+      "version": "0.41.2.15936",
+      "templateHash": "6281368260772580944"
     }
   },
   "parameters": {
@@ -381,7 +381,7 @@
       }
     ],
     "webServerFarmResourceName": "[format('asp-{0}', variables('solutionSuffix'))]",
-    "reactAppLayoutConfig": "{\n  \"appConfig\": {\n      \"CHAT_CHATHISTORY\": {\n        \"CHAT\": 70,\n        \"CHATHISTORY\": 30\n      }\n    }\n  }\n}",
+    "reactAppLayoutConfig": "{\r\n  \"appConfig\": {\r\n      \"CHAT_CHATHISTORY\": {\r\n        \"CHAT\": 70,\r\n        \"CHATHISTORY\": 30\r\n      }\r\n    }\r\n  }\r\n}",
     "backendWebSiteResourceName": "[format('api-{0}', variables('solutionSuffix'))]",
     "aiProjectResourceId": "[resourceId('Microsoft.CognitiveServices/accounts/projects', variables('aiFoundryAiServicesResourceName'), variables('aiFoundryAiProjectResourceName'))]",
     "webSiteResourceName": "[format('app-{0}', variables('solutionSuffix'))]"
@@ -432,6 +432,28 @@
       "subscriptionId": "[variables('aiFoundryAiServicesSubscriptionId')]",
       "resourceGroup": "[variables('aiFoundryAiServicesResourceGroupName')]",
       "name": "[variables('aiFoundryAiServicesResourceName')]"
+    },
+    "aiServicesPollScript": {
+      "condition": "[and(parameters('enablePrivateNetworking'), not(variables('useExistingAiFoundryAiProject')))]",
+      "type": "Microsoft.Resources/deploymentScripts",
+      "apiVersion": "2023-08-01",
+      "name": "[format('poll-ai-services-{0}', uniqueString(resourceGroup().id))]",
+      "location": "[parameters('location')]",
+      "kind": "AzurePowerShell",
+      "identity": {
+        "type": "SystemAssigned"
+      },
+      "properties": {
+        "azPowerShellVersion": "12.0",
+        "scriptContent": "    param([string]$resourceGroupName, [string]$accountName)\r\n    $maxRetries = 60\r\n    $retryCount = 0\r\n    do {\r\n      try {\r\n        $account = Get-AzCognitiveServicesAccount -ResourceGroupName $resourceGroupName -Name $accountName -ErrorAction SilentlyContinue\r\n        if ($account -and $account.ProvisioningState -eq 'Succeeded') {\r\n          Write-Output \"AI Services provisioning completed with state: $($account.ProvisioningState)\"\r\n          break\r\n        }\r\n      } catch {\r\n        Write-Output \"Error checking provisioning state: $_\"\r\n      }\r\n      $retryCount++\r\n      if ($retryCount -ge $maxRetries) {\r\n        Write-Output \"Warning: AI Services did not reach terminal state within expected time, proceeding anyway (attempt $retryCount/$maxRetries)\"\r\n        break\r\n      }\r\n      Write-Output \"Waiting for AI Services provisioning... (attempt $retryCount/$maxRetries)\"\r\n      Start-Sleep -Seconds 5\r\n    } while ($true)\r\n    ",
+        "arguments": "[format('-resourceGroupName \"{0}\" -accountName \"{1}\"', resourceGroup().name, variables('aiFoundryAiServicesResourceName'))]",
+        "retentionInterval": "PT1H",
+        "timeout": "PT30M",
+        "cleanupPreference": "OnExpiration"
+      },
+      "dependsOn": [
+        "aiFoundryAiServices"
+      ]
     },
     "searchService": {
       "type": "Microsoft.Search/searchServices",
@@ -4420,8 +4442,8 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.43.8.12551",
-              "templateHash": "3334983351757312195"
+              "version": "0.41.2.15936",
+              "templateHash": "11110757456691376710"
             }
           },
           "definitions": {
@@ -23733,8 +23755,8 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.43.8.12551",
-              "templateHash": "5288388528788440524"
+              "version": "0.41.2.15936",
+              "templateHash": "1108363872642748299"
             }
           },
           "definitions": {
@@ -27296,9 +27318,8 @@
       },
       "dependsOn": [
         "aiFoundryAiServices",
-        "[format('avmPrivateDnsZones[{0}]', variables('dnsZoneIndex').cognitiveServices)]",
-        "[format('avmPrivateDnsZones[{0}]', variables('dnsZoneIndex').openAI)]",
-        "[format('avmPrivateDnsZones[{0}]', variables('dnsZoneIndex').aiServices)]",
+        "aiServicesPollScript",
+        "avmPrivateDnsZones",
         "virtualNetwork"
       ]
     },
@@ -29450,8 +29471,8 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.43.8.12551",
-              "templateHash": "1735625309877492934"
+              "version": "0.41.2.15936",
+              "templateHash": "14729770453662118856"
             }
           },
           "parameters": {
@@ -29550,8 +29571,8 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.43.8.12551",
-              "templateHash": "1433080150197323850"
+              "version": "0.41.2.15936",
+              "templateHash": "3417037242619406993"
             }
           },
           "parameters": {
@@ -36444,8 +36465,8 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.43.8.12551",
-              "templateHash": "15490584693408563123"
+              "version": "0.41.2.15936",
+              "templateHash": "1965463467367942079"
             }
           },
           "definitions": {
@@ -37451,8 +37472,8 @@
                   "metadata": {
                     "_generator": {
                       "name": "bicep",
-                      "version": "0.43.8.12551",
-                      "templateHash": "16163995530530399452"
+                      "version": "0.41.2.15936",
+                      "templateHash": "402304462716062324"
                     },
                     "name": "Site App Settings",
                     "description": "This module deploys a Site App Setting."
@@ -38374,8 +38395,8 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.43.8.12551",
-              "templateHash": "11416468254207116029"
+              "version": "0.41.2.15936",
+              "templateHash": "1783553076065298345"
             }
           },
           "parameters": {
@@ -38494,8 +38515,8 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.43.8.12551",
-              "templateHash": "11416468254207116029"
+              "version": "0.41.2.15936",
+              "templateHash": "1783553076065298345"
             }
           },
           "parameters": {
@@ -38608,8 +38629,8 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.43.8.12551",
-              "templateHash": "11416468254207116029"
+              "version": "0.41.2.15936",
+              "templateHash": "1783553076065298345"
             }
           },
           "parameters": {
@@ -38725,8 +38746,8 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.43.8.12551",
-              "templateHash": "11416468254207116029"
+              "version": "0.41.2.15936",
+              "templateHash": "1783553076065298345"
             }
           },
           "parameters": {
@@ -38843,8 +38864,8 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.43.8.12551",
-              "templateHash": "11416468254207116029"
+              "version": "0.41.2.15936",
+              "templateHash": "1783553076065298345"
             }
           },
           "parameters": {
@@ -38998,8 +39019,8 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.43.8.12551",
-              "templateHash": "15490584693408563123"
+              "version": "0.41.2.15936",
+              "templateHash": "1965463467367942079"
             }
           },
           "definitions": {
@@ -40005,8 +40026,8 @@
                   "metadata": {
                     "_generator": {
                       "name": "bicep",
-                      "version": "0.43.8.12551",
-                      "templateHash": "16163995530530399452"
+                      "version": "0.41.2.15936",
+                      "templateHash": "402304462716062324"
                     },
                     "name": "Site App Settings",
                     "description": "This module deploys a Site App Setting."
