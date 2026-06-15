@@ -177,23 +177,32 @@ enable_public_access() {
 				ip_rules="${ip_rules}{\"ipAddressOrRange\":\"${_ip}\"}"
 			done
 			ip_rules="${ip_rules}]"
+			if [ "$ip_rules" = "[]" ]; then
+				echo "Error: COSMOS_FIREWALL_IP is set but contains no valid IP/CIDR entries." >&2
+				echo "  Provide a single IP/CIDR or a comma-separated list and re-run." >&2
+				exit 1
+			fi
 		else
 			echo "Getting current IP address..."
 			current_ip=$(curl -s --fail --max-time 10 https://ipinfo.io/ip)
 			current_ip="$(echo "$current_ip" | tr -d '[:space:]')"
 			echo "Current IP: $current_ip"
 
-			# Validate the detected IP is a well-formed IPv4 address before using it in
-			# arithmetic/firewall rules. Behind a proxy/VPN curl may return an empty body,
-			# an error page, or an IPv6 address, which would corrupt the ip_rules JSON.
+			# Validate IPv4 (each octet 0-255); curl may return empty/error/IPv6 behind a proxy.
+			IFS='.' read -r ip1 ip2 ip3 ip4 <<< "$current_ip"
+			valid_ipv4=true
 			if ! [[ "$current_ip" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
+				valid_ipv4=false
+			else
+				for _octet in "$ip1" "$ip2" "$ip3" "$ip4"; do
+					if [ "$_octet" -gt 255 ]; then valid_ipv4=false; break; fi
+				done
+			fi
+			if [ "$valid_ipv4" != true ]; then
 				echo "Error: Could not auto-detect a valid IPv4 public IP (got: '$current_ip')." >&2
 				echo "  Set COSMOS_FIREWALL_IP to an explicit IP/CIDR (or comma-separated list) and re-run." >&2
 				exit 1
 			fi
-
-			# Build array of individual IPs to handle NAT/proxy variations (current IP ±2)
-			IFS='.' read -r ip1 ip2 ip3 ip4 <<< "$current_ip"
 
 			echo "Adding multiple IPs to Cosmos DB firewall to handle NAT/proxy variations..."
 			echo "  Base IP: $current_ip"
@@ -702,6 +711,10 @@ while true; do
 	if [ -n "$blocked_ip" ] && [ $upload_attempt -lt $max_upload_attempts ]; then
 		echo "Cosmos DB firewall blocked actual egress IP $blocked_ip - adding it and retrying (attempt $upload_attempt of $max_upload_attempts)..."
 		existing_ips=$(MSYS_NO_PATHCONV=1 az resource show --ids "$cosmos_resource_id" --api-version 2021-04-15 --query "properties.ipRules[].ipAddressOrRange" --output tsv 2>/dev/null)
+		if [ $? -ne 0 ]; then
+			echo "Error: Failed to read existing Cosmos DB firewall rules; aborting recovery to avoid overwriting them." >&2
+			break
+		fi
 		retry_rules="["
 		while IFS= read -r _eip; do
 			[ -z "$_eip" ] && continue

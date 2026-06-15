@@ -496,6 +496,9 @@ try {
             $blockedIp = $ipMatch.Groups[1].Value
             Write-Host "Cosmos DB firewall blocked actual egress IP $blockedIp - adding it and retrying (attempt $attempt of $maxUploadAttempts)..."
             $existingIps = az resource show --ids $cosmos_resource_id --api-version 2021-04-15 --query "properties.ipRules[].ipAddressOrRange" -o tsv 2>$null
+            if ($LASTEXITCODE -ne 0) {
+                throw "Failed to read existing Cosmos DB firewall rules (az resource show exit code $LASTEXITCODE); aborting recovery to avoid overwriting existing rules."
+            }
             $ipList = @()
             if ($existingIps) { $ipList = @($existingIps -split "\r?\n" | Where-Object { $_ }) }
             if ($ipList -notcontains $blockedIp) { $ipList += $blockedIp }

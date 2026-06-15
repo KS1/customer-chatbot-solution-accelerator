@@ -507,6 +507,10 @@ echo "Checking if the principal has Foundry User role on the AI Foundry"
 
 # Foundry may be in a different subscription (BYO), so scope role ops to it.
 aif_subscription_id=$(echo "$aiFoundryResourceId" | sed -n 's|.*/subscriptions/\([^/]*\)/.*|\1|p')
+if [ -z "$aif_subscription_id" ]; then
+    # Fall back to current subscription if not parseable from the resource ID.
+    aif_subscription_id="$azSubscriptionId"
+fi
 
 if [ "$SKIP_ROLE_ASSIGNMENT" != "true" ] && [ -n "$signed_user_id" ]; then
     role_assignment=$(MSYS_NO_PATHCONV=1 az role assignment list \

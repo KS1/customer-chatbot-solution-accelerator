@@ -257,6 +257,10 @@ if ($aifAccountResourceId -match '/resourceGroups/([^/]+)/') {
 if ($aifAccountResourceId -match '/subscriptions/([^/]+)/') {
     $aifSubscriptionId = $Matches[1]
 }
+if (-not $aifSubscriptionId) {
+    # Fall back to current subscription if not parseable from the resource ID.
+    $aifSubscriptionId = $azSubscriptionId
+}
 
 Write-Host "Getting signed in user id"
 $signed_user_id = az ad signed-in-user show --query id -o tsv
