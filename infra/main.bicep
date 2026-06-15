@@ -882,12 +882,20 @@ module aiFoundryPrivateEndpoint 'br/public:avm/res/network/private-endpoint:0.12
 
 // ========== AI Services Provisioning State Wait (fixes private endpoint conflicts) ========== //
 // Ensures AI Services resource reaches terminal provisioning state before private endpoint connection attempts
+resource aiServicesPollIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = if (enablePrivateNetworking && !useExistingAiFoundryAiProject) {
+  name: 'uami-ai-poll-${solutionSuffix}'
+  location: location
+}
+
 resource aiServicesPollScript 'Microsoft.Resources/deploymentScripts@2023-08-01' = if (enablePrivateNetworking && !useExistingAiFoundryAiProject) {
   name: 'poll-ai-services-${uniqueString(resourceGroup().id)}'
   location: location
   kind: 'AzurePowerShell'
   identity: {
-    type: 'SystemAssigned'
+    type: 'UserAssigned'
+    userAssignedIdentities: {
+      '${aiServicesPollIdentity.id}': {}
+    }
   }
   properties: {
     azPowerShellVersion: '12.0'

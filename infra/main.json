@@ -6,7 +6,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.41.2.15936",
-      "templateHash": "6281368260772580944"
+      "templateHash": "7017055471068829242"
     }
   },
   "parameters": {
@@ -433,6 +433,13 @@
       "resourceGroup": "[variables('aiFoundryAiServicesResourceGroupName')]",
       "name": "[variables('aiFoundryAiServicesResourceName')]"
     },
+    "aiServicesPollIdentity": {
+      "condition": "[and(parameters('enablePrivateNetworking'), not(variables('useExistingAiFoundryAiProject')))]",
+      "type": "Microsoft.ManagedIdentity/userAssignedIdentities",
+      "apiVersion": "2023-01-31",
+      "name": "[format('uami-ai-poll-{0}', variables('solutionSuffix'))]",
+      "location": "[parameters('location')]"
+    },
     "aiServicesPollScript": {
       "condition": "[and(parameters('enablePrivateNetworking'), not(variables('useExistingAiFoundryAiProject')))]",
       "type": "Microsoft.Resources/deploymentScripts",
@@ -441,7 +448,10 @@
       "location": "[parameters('location')]",
       "kind": "AzurePowerShell",
       "identity": {
-        "type": "SystemAssigned"
+        "type": "UserAssigned",
+        "userAssignedIdentities": {
+          "[format('{0}', resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', format('uami-ai-poll-{0}', variables('solutionSuffix'))))]": {}
+        }
       },
       "properties": {
         "azPowerShellVersion": "12.0",
@@ -452,7 +462,8 @@
         "cleanupPreference": "OnExpiration"
       },
       "dependsOn": [
-        "aiFoundryAiServices"
+        "aiFoundryAiServices",
+        "aiServicesPollIdentity"
       ]
     },
     "searchService": {
