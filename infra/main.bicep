@@ -876,59 +876,6 @@ module aiFoundryPrivateEndpoint 'br/public:avm/res/network/private-endpoint:0.12
   }
   dependsOn: [
     avmPrivateDnsZones
-    aiServicesPollScript  // Wait for AI Services provisioning state to become terminal before attempting private endpoint connection
-  ]
-}
-
-// ========== AI Services Provisioning State Wait (fixes private endpoint conflicts) ========== //
-// Ensures AI Services resource reaches terminal provisioning state before private endpoint connection attempts
-resource aiServicesPollIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = if (enablePrivateNetworking && !useExistingAiFoundryAiProject) {
-  name: 'uami-ai-poll-${solutionSuffix}'
-  location: location
-}
-
-resource aiServicesPollScript 'Microsoft.Resources/deploymentScripts@2023-08-01' = if (enablePrivateNetworking && !useExistingAiFoundryAiProject) {
-  name: 'poll-ai-services-${uniqueString(resourceGroup().id)}'
-  location: location
-  kind: 'AzurePowerShell'
-  identity: {
-    type: 'UserAssigned'
-    userAssignedIdentities: {
-      '${aiServicesPollIdentity.id}': {}
-    }
-  }
-  properties: {
-    azPowerShellVersion: '12.0'
-    scriptContent: '''
-    param([string]$resourceGroupName, [string]$accountName)
-    $maxRetries = 60
-    $retryCount = 0
-    do {
-      try {
-        $account = Get-AzCognitiveServicesAccount -ResourceGroupName $resourceGroupName -Name $accountName -ErrorAction SilentlyContinue
-        if ($account -and $account.ProvisioningState -eq 'Succeeded') {
-          Write-Output "AI Services provisioning completed with state: $($account.ProvisioningState)"
-          break
-        }
-      } catch {
-        Write-Output "Error checking provisioning state: $_"
-      }
-      $retryCount++
-      if ($retryCount -ge $maxRetries) {
-        Write-Output "Warning: AI Services did not reach terminal state within expected time, proceeding anyway (attempt $retryCount/$maxRetries)"
-        break
-      }
-      Write-Output "Waiting for AI Services provisioning... (attempt $retryCount/$maxRetries)"
-      Start-Sleep -Seconds 5
-    } while ($true)
-    '''
-    arguments: '-resourceGroupName "${resourceGroup().name}" -accountName "${aiFoundryAiServicesResourceName}"'
-    retentionInterval: 'PT1H'
-    timeout: 'PT30M'
-    cleanupPreference: 'OnExpiration'
-  }
-  dependsOn: [
-    aiFoundryAiServices
   ]
 }
 

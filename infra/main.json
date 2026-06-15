@@ -6,7 +6,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.41.2.15936",
-      "templateHash": "7017055471068829242"
+      "templateHash": "13001777187243831822"
     }
   },
   "parameters": {
@@ -432,39 +432,6 @@
       "subscriptionId": "[variables('aiFoundryAiServicesSubscriptionId')]",
       "resourceGroup": "[variables('aiFoundryAiServicesResourceGroupName')]",
       "name": "[variables('aiFoundryAiServicesResourceName')]"
-    },
-    "aiServicesPollIdentity": {
-      "condition": "[and(parameters('enablePrivateNetworking'), not(variables('useExistingAiFoundryAiProject')))]",
-      "type": "Microsoft.ManagedIdentity/userAssignedIdentities",
-      "apiVersion": "2023-01-31",
-      "name": "[format('uami-ai-poll-{0}', variables('solutionSuffix'))]",
-      "location": "[parameters('location')]"
-    },
-    "aiServicesPollScript": {
-      "condition": "[and(parameters('enablePrivateNetworking'), not(variables('useExistingAiFoundryAiProject')))]",
-      "type": "Microsoft.Resources/deploymentScripts",
-      "apiVersion": "2023-08-01",
-      "name": "[format('poll-ai-services-{0}', uniqueString(resourceGroup().id))]",
-      "location": "[parameters('location')]",
-      "kind": "AzurePowerShell",
-      "identity": {
-        "type": "UserAssigned",
-        "userAssignedIdentities": {
-          "[format('{0}', resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', format('uami-ai-poll-{0}', variables('solutionSuffix'))))]": {}
-        }
-      },
-      "properties": {
-        "azPowerShellVersion": "12.0",
-        "scriptContent": "    param([string]$resourceGroupName, [string]$accountName)\r\n    $maxRetries = 60\r\n    $retryCount = 0\r\n    do {\r\n      try {\r\n        $account = Get-AzCognitiveServicesAccount -ResourceGroupName $resourceGroupName -Name $accountName -ErrorAction SilentlyContinue\r\n        if ($account -and $account.ProvisioningState -eq 'Succeeded') {\r\n          Write-Output \"AI Services provisioning completed with state: $($account.ProvisioningState)\"\r\n          break\r\n        }\r\n      } catch {\r\n        Write-Output \"Error checking provisioning state: $_\"\r\n      }\r\n      $retryCount++\r\n      if ($retryCount -ge $maxRetries) {\r\n        Write-Output \"Warning: AI Services did not reach terminal state within expected time, proceeding anyway (attempt $retryCount/$maxRetries)\"\r\n        break\r\n      }\r\n      Write-Output \"Waiting for AI Services provisioning... (attempt $retryCount/$maxRetries)\"\r\n      Start-Sleep -Seconds 5\r\n    } while ($true)\r\n    ",
-        "arguments": "[format('-resourceGroupName \"{0}\" -accountName \"{1}\"', resourceGroup().name, variables('aiFoundryAiServicesResourceName'))]",
-        "retentionInterval": "PT1H",
-        "timeout": "PT30M",
-        "cleanupPreference": "OnExpiration"
-      },
-      "dependsOn": [
-        "aiFoundryAiServices",
-        "aiServicesPollIdentity"
-      ]
     },
     "searchService": {
       "type": "Microsoft.Search/searchServices",
@@ -27329,7 +27296,6 @@
       },
       "dependsOn": [
         "aiFoundryAiServices",
-        "aiServicesPollScript",
         "avmPrivateDnsZones",
         "virtualNetwork"
       ]
