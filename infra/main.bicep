@@ -874,6 +874,9 @@ module aiFoundryPrivateEndpoint 'br/public:avm/res/network/private-endpoint:0.12
     }
     subnetResourceId: virtualNetwork!.outputs.backendSubnetResourceId
   }
+  dependsOn: [
+    avmPrivateDnsZones
+  ]
 }
 
 // ========== Search Service ========== //
