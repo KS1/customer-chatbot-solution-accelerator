@@ -9,6 +9,8 @@
   - App URL: https://app-ccsademo5pokw.azurewebsites.net 
   
   - API URL: https://api-ccsademo5pokw.azurewebsites.net
+ 
+  - Demo Recording Link: https://drive.google.com/file/d/1PDKTifZIR0gvvibnGOj8DOHO6Mgk_z9A/view?usp=sharing 
 
 ### Deployed App Screenshot
 
