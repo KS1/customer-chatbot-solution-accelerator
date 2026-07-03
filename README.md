@@ -24,6 +24,35 @@
 
 ![image](./documents/Images/AzurePortal-Screenshot.png)
 
+## Deployment Notes (Real-World Experience)
+
+While deploying this accelerator to a fresh Azure subscription, I ran into a few gaps between the docs/IaC and reality. Documenting them here for anyone else deploying this from scratch.
+
+### Issues Faced
+
+1. **Deprecated default model version** — The default GPT model pinned in the Bicep parameters was already in Azure's "deprecating" lifecycle and blocked for new deployments in every allowed region, regardless of quota. Required overriding to a currently-supported model via `azd env set`.
+2. **Container registry not wired up** — The App Service configuration references a hardcoded container registry that doesn't belong to this deployment (a leftover value not reset for public release — the Bicep even has a comment flagging it as a test value). There is no Azure Container Registry resource in the IaC, and no automated image build/push step in the `azd` workflow. `ACRBuildAndPushGuide.md` documents a manual fix, but references Dockerfile paths that no longer match the repo structure.
+3. **New-subscription friction** — Brand-new/free Azure subscriptions can hit an automated risk/fraud check when creating Azure OpenAI resources for the first time, independent of RBAC role or billing plan. This needs to clear via Azure support or an established subscription with prior Azure OpenAI usage.
+4. **Split, easy-to-miss quota buckets** — App Service Plan creation draws from a separate, region-specific "Total VMs" quota under the App Service resource provider — distinct from the general Compute vCPU quota most people think to check first. Both can independently be zero on a new subscription.
+5. **Regional capacity varies independently of quota** — AI Search's Basic tier can be transiently out of capacity in a specific region even with quota approved and correct permissions; this is a backend capacity issue, not something fixable via retry logic alone.
+6. **State not preserved across re-provisions** — Re-running `azd provision` resets any app settings that were patched outside of Bicep (e.g., agent IDs written by the post-deployment agent-creation script) back to empty, since the IaC doesn't declare them as persistent.
+
+### Lessons Learned
+
+- Always validate the exact model name/version against current Azure OpenAI model availability before deploying — don't trust that a repo's pinned defaults are still valid.
+- Test resource creation directly via CLI (bypassing the full IaC template) to distinguish "quota/permissions problem" from "genuine regional capacity problem" — they look identical in error messages but need different fixes.
+- Azure quota is siloed by resource provider *and* region; a single "quota increase" request rarely covers everything a multi-service deployment needs.
+- Treat any hardcoded resource identifier in shared IaC as suspect until verified live — "it's in the template" doesn't mean it still exists.
+- For templates with dynamic app settings that get set post-deployment (agent IDs, generated secrets, etc.), any `azd provision` re-run afterward should be followed by re-running those post-deployment steps.
+
+### What I'd Try Next
+
+- Contribute fixes upstream: reset the container registry default, add an actual ACR + image-build step to the `azd` workflow, and update `ACRBuildAndPushGuide.md` to match the real Dockerfile paths.
+- Add a `azd` post-provision hook that re-applies dynamic app settings automatically, so re-provisioning doesn't silently break the running app.
+- Pin to a model-availability check (or a small pre-flight script) that fails fast with a clear message if the configured model is deprecated, instead of surfacing a raw ARM validation error.
+
+## Introduction
+
 This solution accelerator empowers organizations to build intelligent, conversational customer service experiences by leveraging Microsoft Foundry's Agent Framework. With seamless integration of specialized AI agents, and enterprise-grade data services, teams can create chatbots that provide personalized product recommendations, answer policy questions, and deliver exceptional customer support. The solution combines a modern e-commerce frontend with an intelligent backend that uses an orchestrator agent to route customer queries to specialized agents (Product Lookup and Policy/Knowledge), ensuring accurate, contextual responses grounded in product catalogs and policy documents. By unifying AI capabilities with scalable cloud infrastructure, organizations can deliver 24/7 customer support that understands context, maintains conversation history, and provides actionable insights to improve customer satisfaction and operational efficiency.
 
 ---
