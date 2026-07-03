@@ -10,8 +10,6 @@
   
   - API URL: https://api-ccsademo5pokw.azurewebsites.net
 
-  <img src="./documents/Images/Deployed-App-Screenshot.png" />
- 
 ### Deployed App Screenshot
 
 |![image](./documents/Images/Deployed-App-Screenshot.png)|
